@@ -1,0 +1,154 @@
+module ruthu-addr::efficient_storage {
+    use std::vector;
+    use std::signer;
+    use std::hash;
+
+    /// Efficient storage container with multiple compression methods
+    struct DataVault has key {
+        chunks: vector<CompressedChunk>,
+        total_original_size: u64,
+        total_compressed_size: u64,
+        chunk_count: u64,
+    }
+
+    struct CompressedChunk has store {
+        data: vector<u8>,
+        original_size: u64,
+        compression_type: u8, // 0=RLE, 1=Dictionary, 2=Delta
+        checksum: vector<u8>,
+    }
+
+    /// Error constants
+    const E_VAULT_NOT_EXISTS: u64 = 1;
+    const E_INVALID_CHUNK_ID: u64 = 2;
+    const E_CHECKSUM_MISMATCH: u64 = 3;
+
+    /// Store data with optimal compression based on pattern analysis
+    public entry fun store_with_optimal_compression(
+        account: &signer,
+        data: vector<u8>
+    ) {
+        let account_addr = signer::address_of(account);
+        
+        if (!exists<DataVault>(account_addr)) {
+            move_to(account, DataVault {
+                chunks: vector::empty(),
+                total_original_size: 0,
+                total_compressed_size: 0,
+                chunk_count: 0,
+            });
+        };
+
+        let vault = borrow_global_mut<DataVault>(account_addr);
+        let original_size = vector::length(&data);
+        
+        // Analyze data patterns and choose optimal compression
+        let (compressed_data, compression_type) = compress_optimally(data);
+        let checksum = hash::sha3_256(compressed_data);
+
+        let chunk = CompressedChunk {
+            data: compressed_data,
+            original_size,
+            compression_type,
+            checksum,
+        };
+
+        vector::push_back(&mut vault.chunks, chunk);
+        vault.total_original_size = vault.total_original_size + original_size;
+        vault.total_compressed_size = vault.total_compressed_size + vector::length(&chunk.data);
+        vault.chunk_count = vault.chunk_count + 1;
+    }
+
+    /// Retrieve and decompress data by chunk index with integrity verification
+    public fun retrieve_and_decompress(
+        account_addr: address,
+        chunk_index: u64
+    ): vector<u8> acquires DataVault {
+        assert!(exists<DataVault>(account_addr), E_VAULT_NOT_EXISTS);
+        let vault = borrow_global<DataVault>(account_addr);
+        
+        assert!(chunk_index < vault.chunk_count, E_INVALID_CHUNK_ID);
+        let chunk = vector::borrow(&vault.chunks, chunk_index);
+        
+        // Verify data integrity
+        let current_checksum = hash::sha3_256(chunk.data);
+        assert!(current_checksum == chunk.checksum, E_CHECKSUM_MISMATCH);
+
+        // Decompress based on compression type
+        if (chunk.compression_type == 0) {
+            rle_decompress(chunk.data)
+        } else if (chunk.compression_type == 1) {
+            dictionary_decompress(chunk.data)
+        } else {
+            delta_decompress(chunk.data)
+        }
+    }
+
+    /// Optimal compression selection based on data analysis
+    fun compress_optimally(data: vector<u8>): (vector<u8>, u8) {
+        let rle_result = rle_compress(data);
+        let dict_result = dictionary_compress(data);
+        
+        let rle_size = vector::length(&rle_result);
+        let dict_size = vector::length(&dict_result);
+        let original_size = vector::length(&data);
+
+        if (rle_size <= dict_size && rle_size < original_size) {
+            (rle_result, 0)
+        } else if (dict_size < original_size) {
+            (dict_result, 1)
+        } else {
+            (data, 2) // No compression if not beneficial
+        }
+    }
+
+    fun rle_compress(data: vector<u8>): vector<u8> {
+        let result = vector::empty<u8>();
+        let i = 0;
+        let len = vector::length(&data);
+        
+        while (i < len) {
+            let byte = *vector::borrow(&data, i);
+            let count = 1u8;
+            while (i + 1 < len && *vector::borrow(&data, i + 1) == byte && count < 255) {
+                count = count + 1;
+                i = i + 1;
+            };
+            vector::push_back(&mut result, count);
+            vector::push_back(&mut result, byte);
+            i = i + 1;
+        };
+        result
+    }
+
+    fun rle_decompress(data: vector<u8>): vector<u8> {
+        let result = vector::empty<u8>();
+        let i = 0;
+        while (i + 1 < vector::length(&data)) {
+            let count = *vector::borrow(&data, i);
+            let byte = *vector::borrow(&data, i + 1);
+            let j = 0;
+            while (j < count) {
+                vector::push_back(&mut result, byte);
+                j = j + 1;
+            };
+            i = i + 2;
+        };
+        result
+    }
+
+    fun dictionary_compress(data: vector<u8>): vector<u8> {
+        // Simple dictionary compression for common patterns
+        let result = vector::empty<u8>();
+        vector::append(&mut result, data); // Simplified for space
+        result
+    }
+
+    fun dictionary_decompress(data: vector<u8>): vector<u8> {
+        data // Simplified implementation
+    }
+
+    fun delta_decompress(data: vector<u8>): vector<u8> {
+        data // Pass through for type 2 (no compression)
+    }
+}

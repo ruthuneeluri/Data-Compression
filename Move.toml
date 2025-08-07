@@ -1,0 +1,15 @@
+[package]
+name = "datacompression"
+version = "1.0.0"
+authors = []-
+
+[addresses]
+ruthu_addr="0x1cbc2dbd54fcbe835a29917b8d698e760c559cd9c761b4d318a51495eee43a36"
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-framework.git"
+rev = "mainnet"
+subdir = "aptos-framework"
+
+[dev-dependencies]
