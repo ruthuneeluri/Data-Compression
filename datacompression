@@ -3,7 +3,7 @@ module ruthu-addr::efficient_storage {
     use std::signer;
     use std::hash;
 
-    /// Efficient storage container with multiple compression methods
+    
     struct DataVault has key {
         chunks: vector<CompressedChunk>,
         total_original_size: u64,
@@ -14,16 +14,16 @@ module ruthu-addr::efficient_storage {
     struct CompressedChunk has store {
         data: vector<u8>,
         original_size: u64,
-        compression_type: u8, // 0=RLE, 1=Dictionary, 2=Delta
+        compression_type: u8, 
         checksum: vector<u8>,
     }
 
-    /// Error constants
+  
     const E_VAULT_NOT_EXISTS: u64 = 1;
     const E_INVALID_CHUNK_ID: u64 = 2;
     const E_CHECKSUM_MISMATCH: u64 = 3;
 
-    /// Store data with optimal compression based on pattern analysis
+    
     public entry fun store_with_optimal_compression(
         account: &signer,
         data: vector<u8>
@@ -42,7 +42,7 @@ module ruthu-addr::efficient_storage {
         let vault = borrow_global_mut<DataVault>(account_addr);
         let original_size = vector::length(&data);
         
-        // Analyze data patterns and choose optimal compression
+        
         let (compressed_data, compression_type) = compress_optimally(data);
         let checksum = hash::sha3_256(compressed_data);
 
@@ -59,7 +59,7 @@ module ruthu-addr::efficient_storage {
         vault.chunk_count = vault.chunk_count + 1;
     }
 
-    /// Retrieve and decompress data by chunk index with integrity verification
+    
     public fun retrieve_and_decompress(
         account_addr: address,
         chunk_index: u64
@@ -70,11 +70,11 @@ module ruthu-addr::efficient_storage {
         assert!(chunk_index < vault.chunk_count, E_INVALID_CHUNK_ID);
         let chunk = vector::borrow(&vault.chunks, chunk_index);
         
-        // Verify data integrity
+        
         let current_checksum = hash::sha3_256(chunk.data);
         assert!(current_checksum == chunk.checksum, E_CHECKSUM_MISMATCH);
 
-        // Decompress based on compression type
+        
         if (chunk.compression_type == 0) {
             rle_decompress(chunk.data)
         } else if (chunk.compression_type == 1) {
@@ -84,7 +84,7 @@ module ruthu-addr::efficient_storage {
         }
     }
 
-    /// Optimal compression selection based on data analysis
+   
     fun compress_optimally(data: vector<u8>): (vector<u8>, u8) {
         let rle_result = rle_compress(data);
         let dict_result = dictionary_compress(data);
@@ -98,7 +98,7 @@ module ruthu-addr::efficient_storage {
         } else if (dict_size < original_size) {
             (dict_result, 1)
         } else {
-            (data, 2) // No compression if not beneficial
+            (data, 2) 
         }
     }
 
@@ -138,17 +138,18 @@ module ruthu-addr::efficient_storage {
     }
 
     fun dictionary_compress(data: vector<u8>): vector<u8> {
-        // Simple dictionary compression for common patterns
+       
         let result = vector::empty<u8>();
-        vector::append(&mut result, data); // Simplified for space
+        vector::append(&mut result, data); 
         result
     }
 
     fun dictionary_decompress(data: vector<u8>): vector<u8> {
-        data // Simplified implementation
+        data 
     }
 
     fun delta_decompress(data: vector<u8>): vector<u8> {
-        data // Pass through for type 2 (no compression)
+        data 
     }
+
 }
